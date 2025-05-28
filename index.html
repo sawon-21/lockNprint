@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>lockNprint - Secure Print Sharing</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #1e1e2f, #2a2a4a, #3b3b6a);
+      color: #e0e0e0;
+      font-family: 'Poppins', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow-x: hidden;
+      user-select: none; /* Prevent text selection */
+    }
+    .container {
+      max-width: 540px;
+      padding: 20px;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      backdrop-filter: blur(15px);
+      padding: 28px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      transition: transform 0.4s ease, box-shadow 0.4s ease;
+      animation: slideIn 0.5s ease-out;
+    }
+    .card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 14px 48px rgba(0, 0, 0, 0.4);
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .btn-primary-modern {
+      background: linear-gradient(90deg, #6366f1, #a855f7);
+      color: #fff;
+      border: none;
+      padding: 14px 28px;
+      border-radius: 12px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-primary-modern:hover {
+      background: linear-gradient(90deg, #4f46e5, #9333ea);
+      transform: scale(1.08);
+      box-shadow: 0 4px 20px rgba(99, 102, 241, 0.5);
+    }
+    .btn-primary-modern::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      transition: width 0.6s ease, height 0.6s ease;
+    }
+    .btn-primary-modern:hover::after {
+      width: 200px;
+      height: 200px;
+    }
+    .status-bar {
+      font-size: 15px;
+      color: #a855f7;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 24px;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    .spinner {
+      border: 3px solid #a855f7;
+      border-top: 3px solid transparent;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      animation: spin 0.8s linear infinite;
+      display: none;
+    }
+    .spinner.active { display: inline-block; }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .form-control {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      padding: 12px;
+      transition: all 0.3s ease;
+    }
+    .form-control:focus {
+      border-color: #a855f7;
+      box-shadow: 0 0 10px rgba(168, 85, 247, 0.4);
+    }
+    .form-control::placeholder { color: rgba(255, 255, 255, 0.6); }
+    canvas, video, iframe, img {
+      max-width: 100%;
+      border-radius: 10px;
+      margin-top: 20px;
+      transition: transform 0.3s ease;
+    }
+    img:hover, iframe:hover { transform: scale(1.02); }
+    .hidden { display: none; }
+    .file-preview iframe { height: 400px; width: 100%; border: none; }
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .stats div {
+      background: gold;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: bold;
+      color: black;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.3s ease;
+    }
+    .stats div:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    @font-face {
+      font-family: 'Noxlock-Free';
+      src: url('Noxlock-Free.otf') format('truetype');
+    }
+    .title {
+font-family: 'Noxlock-Free', 'Poppins', sans-serif;
+      font-size: 2rem;
+      font-weight: 600;
+      background: linear-gradient(90deg, yellow, #a855f7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 16px;
+    }
+    .subtitle {
+      font-size: 1rem;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 24px;
+    }
+    .code-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin: 20px 0;
+    }
+    .code-display {
+      font-size: 1.8rem;
+      letter-spacing: 2px;
+      color: #fff;
+      background: rgba(99, 102, 241, 0.2);
+      padding: 10px 20px;
+      border-radius: 8px;
+    }
+    .copy-btn {
+      background: none;
+      border: none;
+      color: #a855f7;
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: color 0.3s ease, transform 0.3s ease;
+    }
+    .copy-btn:hover {
+      color: #c084fc;
+      transform: scale(1.2);
+    }
+    .file-input-container {
+      position: relative;
+      display: inline-block;
+      width: 100%;
+    }
+    .file-input-container input[type="file"] {
+      width: 100%;
+      opacity: 0;
+      position: absolute;
+      top: 0;
+      left: 0;
+      cursor: pointer;
+    }
+    .file-input-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: linear-gradient(90deg, #6366f1, #a855f7);
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .file-input-label:hover {
+      background: linear-gradient(90deg, #4f46e5, #9333ea);
+      transform: scale(1.05);
+    }
+    .info-button {
+      font-family: 'Poppins', sans-serif;
+      display: inline-flex;
+      align-items: center;
+      cursor: pointer;
+      padding: 8px 12px;
+      color: #888;
+      border-radius: 8px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+    .info-button:hover {
+      background: linear-gradient(90deg, #4f46e5, #9333ea);
+      color: #fff;
+    }
+    .info-button i {
+      margin-right: 6px;
+    }
+    .modal-content {
+      background: #1e1e2f;
+      color: #e0e0e0;
+      border-radius: 12px;
+      border: none;
+      animation: zoomIn 0.4s ease;
+    }
+    .modal-header {
+      border-bottom: 1px solid #333;
+    }
+    .modal-body {
+      max-height: 70vh;
+      overflow-y: auto;
+      padding: 1rem 1.5rem;
+      animation: slideInUp 0.5s ease;
+    }
+    .modal-footer {
+      border-top: 1px solid #333;
+    }
+    .section-title {
+      margin-top: 1.5rem;
+      font-weight: bold;
+      color: gold;
+    }
+    .table td, .table th {
+      vertical-align: middle;
+    }
+    @keyframes zoomIn {
+      from { transform: scale(0.8); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    @keyframes slideInUp {
+      from { transform: translateY(40px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    small{
+      font-size: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Modal -->
+    <div class="modal fade" id="infoModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content shadow-lg">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="fas fa-print me-2 text-info"></i>lockNprint – নিরাপদ ডাউনলোডবিহীন প্রিন্টিং ওয়েব অ্যাপ</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p><strong>lockNprint</strong> একটি নিরাপদ ওয়েব অ্যাপ যেখানে মোবাইল থেকে QR বা কোড দিয়ে ফাইল প্রিন্ট করা যায় কোনো ডাউনলোড বা সার্ভার ছাড়াই।</p>
+            <h5 class="section-title"><i class="fas fa-thumbtack me-2"></i>বৈশিষ্ট্যসমূহ</h5>
+            <ul>
+              <li><i class="fas fa-lock me-2"></i>100% Privacy – ফাইল কখনোই সার্ভারে যায় না</li>
+              <li><i class="fas fa-link me-2"></i>QR বা কোড দিয়ে কানেকশন</li>
+              <li><i class="fas fa-folder-open me-2"></i>মোবাইল → কম্পিউটার প্রিন্ট</li>
+              <li><i class="fas fa-ban me-2"></i>ডাউনলোড, কপি, Inspect বন্ধ</li>
+              <li><i class="fas fa-bomb me-2"></i>প্রিন্টের পর ফাইল মুছে যায়</li>
+              <li><i class="fas fa-desktop me-2"></i>সব ডিভাইস সাপোর্টেড</li>
+            </ul>
+            <h5 class="section-title"><i class="fas fa-bullseye me-2"></i>সমস্যা সমাধান</h5>
+            <p>দোকানে প্রিন্ট দিতে গেলে ফাইল WhatsApp/Email করতে হয়, যা ঝুঁকিপূর্ণ। lockNprint এই ঝুঁকি দূর করে:</p>
+            <ul>
+              <li><i class="fas fa-user-secret me-2"></i>P2P Secure Link</li>
+              <li><i class="fas fa-eye-slash me-2"></i>No server save</li>
+              <li><i class="fas fa-print me-2"></i>শুধু প্রিন্ট</li>
+            </ul>
+            <h5 class="section-title"><i class="fas fa-camera me-2"></i>ব্যবহার পদ্ধতি</h5>
+            <strong><i class="fas fa-desktop me-2"></i>কম্পিউটার:</strong>
+            <ol>
+              <li>“Connect to Phone” ক্লিক</li>
+              <li>QR/Code পাবেন</li>
+              <li>মোবাইল কানেক্ট হলে ফাইল দেখা যাবে</li>
+              <li>Print বাটনে ক্লিক করলেই প্রিন্ট</li>
+            </ol>
+            <strong><i class="fas fa-mobile-screen me-2"></i>মোবাইল:</strong>
+            <ol>
+              <li>“Enter Code”/“Scan QR” নির্বাচন</li>
+              <li>কানেক্ট করুন</li>
+              <li>ফাইল আপলোড করুন</li>
+              <li>প্রিন্ট হবে</li>
+              <li>কতবার প্রিন্ট করা হচ্ছে তা সরাসরি দেখা যাবে</li>
+            </ol>
+            <h5 class="section-title"><i class="fas fa-shield-halved me-2"></i>নিরাপত্তা ব্যবস্থা</h5>
+            <ul>
+              <li><i class="fas fa-ban me-2"></i>ডাউনলোড নিষিদ্ধ (Ctrl+S, Right Click)</li>
+              <li><i class="fas fa-code me-2"></i>Inspect Blocked</li>
+              <li><i class="fas fa-memory me-2"></i>File stays in RAM only</li>
+              <li><i class="fas fa-fire-alt me-2"></i>Auto Destroy after print</li>
+              <li><i class="fas fa-user-lock me-2"></i>One-time Join Only</li>
+            </ul>
+            <h5 class="section-title"><i class="fas fa-wrench me-2"></i>আপডেট ও ডেভেলপমেন্ট</h5>
+            <ul>
+              <li><i class="fas fa-sync-alt me-2 text-info"></i>lockNprint এ প্রতিনিয়ত উন্নয়ন চলছে</li>
+              <li><i class="fas fa-hammer me-2 text-warning"></i>নতুন ফিচার, বাগ ফিক্স, ইউআই উন্নয়ন নিয়মিত হয়</li>
+              <li><i class="fas fa-code-branch me-2 text-success"></i>বর্তমান ভার্সন: <strong>v.0.3</strong></li>
+              <li><i class="fas fa-calendar-check me-2 text-primary"></i>সর্বশেষ আপডেট: <strong>২০২৫-০৫-২৮</strong></li>
+              <li><i class="fas fa-users-cog me-2 text-light"></i>ইউজার ফিডব্যাক অনুযায়ী ফিচার যুক্ত হয়</li>
+            </ul>
+            <p class="text-muted small">💡 আপনার মতামত আমাদের কাছে গুরুত্বপূর্ণ। নতুন ফিচারের জন্য অনুরোধ করতে পারেন।</p>
+          </div>
+          <div class="modal-footer justify-content-end">
+            <button type="button" class="btn btn-primary-modern" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Home -->
+    <div id="home" class="card">
+       <!-- Flaticon Attribution Required -->
+  <img src="https://cdn-icons-png.flaticon.com/512/3122/3122502.png" 
+     alt="Security Icon" 
+     width="44" 
+     height="44" 
+     style="animation: bounce 3s infinite;">
+
+<style>
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+</style>
+      <h2 class="title">lockNprint</h2>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <p class="subtitle mb-0">Secure & Smart Print Sharing</p>
+        <div class="info-button" data-bs-toggle="modal" data-bs-target="#infoModal">
+          <i class="fas fa-circle-info"></i> Details
+        </div>
+      </div>
+      <div class="d-flex justify-content-center gap-4 flex-wrap">
+        <button class="btn-primary-modern" onclick="showMode('phone')">
+          <i class="fas fa-mobile-alt"></i> Connect To PC <small>(For Mobile User)</small>
+        </button>
+        <button class="btn-primary-modern" onclick="showMode('pc')">
+          <i class="fas fa-desktop"></i> Connect To Phone <small>(Only PC)</small>
+        </button>
+      </div>
+    </div>
+
+    <!-- PC Mode -->
+    <div id="pcMode" class="card hidden">
+      <div class="status-bar">
+        <i class="fas fa-info-circle"></i>
+        <span id="statusTextPC">Initializing...</span>
+        <div id="statusSpinnerPC" class="spinner"></div>
+      </div>
+      <h5 style="color:pink">Room Code:</h5>
+      <div class="code-container">
+        <p id="genCode" class="code-display">--------</p>
+        <button class="copy-btn" onclick="copyCode()" title="Copy Code">
+          <i class="fas fa-copy"></i>
+        </button>
+      </div>
+      <canvas id="qrCanvas"></canvas>
+      <div class="stats">
+        <div><i class="fas fa-file-alt"></i> Files: <span id="fileCount">0</span></div>
+        <div><i class="fas fa-print"></i> Prints: <span id="printCount">0</span></div>
+      </div>
+      <button id="printBtn" class="btn-primary-modern mt-4" onclick="printFiles()" disabled>
+        <i class="fas fa-print"></i> Print All
+      </button>
+    </div>
+
+    <!-- Phone Mode -->
+    <div id="phoneMode" class="card hidden">
+      <div class="status-bar">
+        <i class="fas fa-info-circle"></i>
+        <span id="statusTextPhone">Enter Code or Scan QR</span>
+        <div id="statusSpinnerPhone" class="spinner"></div>
+      </div>
+      <input id="inputCode" type="text" class="form-control mb-3" placeholder="Enter 8-character code">
+      <button class="btn-primary-modern" onclick="connectToPC()">
+        <i class="fas fa-link"></i> Connect
+      </button>
+      <p class="mt-3 mb-2 subtitle">Or scan QR code:</p>
+      <div id="reader" style="width: 100%; max-width: 400px; margin: auto;"></div>
+      <div id="fileUpload" class="hidden mt-4">
+        <div class="file-input-container">
+          <input type="file" id="fileInput" multiple accept="image/*,application/pdf">
+          <label for="fileInput" class="file-input-label">
+            <i class="fas fa-upload"></i> Choose Files (Images/PDFs)
+          </label>
+        </div>
+        <div class="file-preview" id="filePreview"></div>
+        <div class="stats">
+          <div><i class="fas fa-file-alt"></i> Sent Files: <span id="fileCountPhone">0</span></div>
+          <div><i class="fas fa-print"></i> Prints: <span id="printCountPhone">0</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+    import { getDatabase, ref, set, onValue, get, remove, update } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-database.js";
+
+    // Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyAmoQgoL34LdCOmiVgRpiP4PiuyrPaiAAs",
+      authDomain: "safe-f4f8b.firebaseapp.com",
+      projectId: "safe-f4f8b",
+      storageBucket: "safe-f4f8b.appspot.com",
+      messagingSenderId: "842528382804",
+      appId: "1:842528382804:web:4dd1d5451290d46558b2c1",
+      databaseURL: "https://safe-f4f8b-default-rtdb.firebaseio.com"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // DOM Elements
+    const home = document.getElementById('home');
+    const pcMode = document.getElementById('pcMode');
+    const phoneMode = document.getElementById('phoneMode');
+    const statusTextPC = document.getElementById('statusTextPC');
+    const statusSpinnerPC = document.getElementById('statusSpinnerPC');
+    const statusTextPhone = document.getElementById('statusTextPhone');
+    const statusSpinnerPhone = document.getElementById('statusSpinnerPhone');
+    const fileInput = document.getElementById('fileInput');
+    const filePreview = document.getElementById('filePreview');
+    let roomCode = '';
+    let qrScanner = null;
+    let fileURLs = []; // Track file URLs for revocation
+
+    // Utility Functions
+    const setStatus = (mode, text, isLoading = false, timeout = 0) => {
+      const statusText = mode === 'pc' ? statusTextPC : statusTextPhone;
+      const statusSpinner = mode === 'pc' ? statusSpinnerPC : statusSpinnerPhone;
+      statusText.textContent = text;
+      statusSpinner.classList.toggle('active', isLoading);
+      if (timeout > 0) {
+        setTimeout(() => {
+          if (mode === 'phone' && statusText.textContent === text) {
+            setStatus('phone', 'Enter code or scan QR', false);
+          }
+        }, timeout);
+      }
+    };
+
+    // Security: Disable right-click, shortcuts, and dev tools
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('keydown', e => {
+      if (e.ctrlKey && (e.key === 's' || e.key === 'S' || e.key === 'u' || e.key === 'U')) e.preventDefault();
+      if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J'))) e.preventDefault();
+    });
+
+    // Copy Room Code
+    window.copyCode = async () => {
+      try {
+        await navigator.clipboard.writeText(roomCode);
+        setStatus('pc', 'Code copied to clipboard', false, 2000);
+      } catch (error) {
+        setStatus('pc', 'Failed to copy code', false, 2000);
+        console.error('Copy error:', error);
+      }
+    };
+
+    // Show Mode
+    window.showMode = (mode) => {
+      home.classList.add('hidden');
+      home.classList.remove('slideIn');
+      if (mode === 'pc') {
+        pcMode.classList.remove('hidden');
+        pcMode.classList.add('slideIn');
+        initPC();
+      } else {
+        phoneMode.classList.remove('hidden');
+        phoneMode.classList.add('slideIn');
+        initPhone();
+      }
+    };
+
+    // Initialize PC Mode
+    async function initPC() {
+      setStatus('pc', 'Generating code...', true);
+      roomCode = Math.random().toString(36).slice(2, 10).toUpperCase();
+      document.getElementById('genCode').textContent = roomCode;
+      new QRious({ element: document.getElementById('qrCanvas'), value: roomCode, size: 200 });
+      try {
+        await set(ref(db, `rooms/${roomCode}`), { fileCount: 0, printCount: 0, host: true });
+        setStatus('pc', 'Waiting for connection...', false);
+
+        // Listen for file updates
+        onValue(ref(db, `rooms/${roomCode}/fileCount`), (snapshot) => {
+          const count = snapshot.val() || 0;
+          document.getElementById('fileCount').textContent = count;
+          document.getElementById('printBtn').disabled = count === 0;
+          if (count > 0) setStatus('pc', 'Ready to print', false);
+        });
+
+        // Listen for print updates
+        onValue(ref(db, `rooms/${roomCode}/printCount`), (snapshot) => {
+          document.getElementById('printCount').textContent = snapshot.val() || 0;
+        });
+      } catch (error) {
+        setStatus('pc', 'Failed to initialize', false, 2000);
+        console.error('PC Init error:', error);
+      }
+    }
+
+    // Initialize Phone Mode
+    function initPhone() {
+      setStatus('phone', 'Enter code or scan QR', false);
+      startQR();
+    }
+
+    // Connect to PC
+    window.connectToPC = async () => {
+      roomCode = document.getElementById('inputCode').value.trim().toUpperCase();
+      if (!roomCode || roomCode.length !== 8) {
+        setStatus('phone', 'Enter a valid 8-character code', false, 3000);
+        return;
+      }
+      setStatus('phone', 'Connecting...', true);
+      try {
+        const snapshot = await get(ref(db, `rooms/${roomCode}/host`));
+        if (!snapshot.exists()) {
+          setStatus('phone', 'PC not online', false, 3000);
+          return;
+        }
+        setStatus('phone', 'Connected to PC', false);
+        document.getElementById('fileUpload').classList.remove('hidden');
+        stopQR();
+
+        // Update initial counts
+        const fileCount = await get(ref(db, `rooms/${roomCode}/fileCount`));
+        document.getElementById('fileCountPhone').textContent = fileCount.val() || 0;
+        const printCount = await get(ref(db, `rooms/${roomCode}/printCount`));
+        document.getElementById('printCountPhone').textContent = printCount.val() || 0;
+
+        // Listen for updates
+        onValue(ref(db, `rooms/${roomCode}/fileCount`), (snapshot) => {
+          document.getElementById('fileCountPhone').textContent = snapshot.val() || 0;
+        });
+        onValue(ref(db, `rooms/${roomCode}/printCount`), (snapshot) => {
+          document.getElementById('printCountPhone').textContent = snapshot.val() || 0;
+        });
+      } catch (error) {
+        setStatus('phone', 'Connection failed', false, 3000);
+        console.error('Connection error:', error);
+      }
+    };
+
+    // File Upload Handler
+    fileInput.addEventListener('change', async (event) => {
+      const files = Array.from(event.target.files);
+      if (files.length === 0) {
+        setStatus('phone', 'No files selected', false, 3000);
+        return;
+      }
+      if (files.some(file => !file.type.match(/image\/.*|application\/pdf/) || file.size > 10 * 1024 * 1024)) {
+        setStatus('phone', 'Invalid file type or size exceeds 10MB', false, 3000);
+        fileInput.value = '';
+        return;
+      }
+      setStatus('phone', 'Uploading files...', true);
+      try {
+        const previews = files.map(file => {
+          const fileId = file.name.replace(/\W/g, '');
+          const url = URL.createObjectURL(file);
+          fileURLs.push(url); // Track for revocation
+          if (file.type.startsWith('image/')) {
+            return `<img src="${url}" alt="${file.name}" class="mb-3" style="animation: fadeIn 0.5s ease;">`;
+          } else if (file.type === 'application/pdf') {
+            return `<iframe src="${url}" height="400" id="previewFrame-${fileId}" class="mb-3" style="animation: fadeIn 0.5s ease;"></iframe>`;
+          }
+          return `<div class="text-muted mb-3">${file.name}</div>`;
+        }).join('');
+        filePreview.innerHTML = previews;
+
+        const currentCount = parseInt(document.getElementById('fileCountPhone').textContent) || 0;
+        await update(ref(db, `rooms/${roomCode}`), { fileCount: currentCount + files.length });
+        document.getElementById('fileCountPhone').textContent = currentCount + files.length;
+        setStatus('phone', `Uploaded ${files.length} file(s) successfully`, false, 3000);
+        fileInput.value = '';
+      } catch (error) {
+        setStatus('phone', 'File upload failed', false, 3000);
+        console.error('File upload error:', error);
+        fileInput.value = '';
+      }
+    });
+
+    // Print Files
+    window.printFiles = async () => {
+      setStatus('pc', 'Preparing to print...', true);
+      const sessionRef = ref(db, `rooms/${roomCode}`);
+      try {
+        const snapshot = await get(sessionRef);
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          const fileCount = data.fileCount || 0;
+          if (fileCount === 0) {
+            setStatus('pc', 'No files to print', false, 3000);
+            return;
+          }
+          document.querySelectorAll('iframe[id^="previewFrame-"]').forEach(iframe => {
+            try {
+              iframe.contentWindow.print();
+            } catch (e) {
+              console.error('Print error:', e);
+            }
+          });
+          await update(sessionRef, { printCount: (data.printCount || 0) + 1 });
+          setStatus('pc', `Printed ${fileCount} file(s)`, false, 3000);
+          // Clear previews and revoke URLs
+          filePreview.innerHTML = '';
+          fileURLs.forEach(url => URL.revokeObjectURL(url));
+          fileURLs = [];
+          await update(ref(db, `rooms/${roomCode}`), { fileCount: 0 });
+          document.getElementById('fileCountPhone').textContent = 0;
+          document.getElementById('fileCount').textContent = 0;
+          document.getElementById('printBtn').disabled = true;
+        } else {
+          setStatus('pc', 'No session found', false, 3000);
+        }
+      } catch (error) {
+        setStatus('pc', 'Print failed', false, 3000);
+        console.error('Print error:', error);
+      }
+    };
+
+    // QR Code Scanner
+    function startQR() {
+      if (!qrScanner) {
+        qrScanner = new Html5Qrcode('reader');
+        Html5Qrcode.getCameras().then(devices => {
+          if (devices && devices.length) {
+            const backCam = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
+            qrScanner.start(
+              backCam.id,
+              { fps: 10, qrbox: { width: 250, height: 250 } },
+              (decodedText) => {
+                if (decodedText.length === 8) {
+                  setStatus('phone', 'QR scanned, connecting...', true);
+                  document.getElementById('inputCode').value = decodedText.toUpperCase();
+                  connectToPC();
+                } else {
+                  setStatus('phone', 'Invalid QR code', false, 3000);
+                }
+              },
+              () => {}
+            ).catch(err => {
+              setStatus('phone', 'QR scanner error: Camera access denied', false, 3000);
+              console.error('QR Scanner error:', err);
+            });
+          } else {
+            setStatus('phone', 'No cameras found', false, 3000);
+          }
+        }).catch(err => {
+          setStatus('phone', 'Failed to access cameras', false, 3000);
+          console.error('Camera access error:', err);
+        });
+      }
+    }
+
+    function stopQR() {
+      if (qrScanner) {
+        qrScanner.stop().then(() => {
+          qrScanner.clear();
+          qrScanner = null;
+          document.getElementById('reader').innerHTML = '';
+        }).catch(err => {
+          setStatus('phone', 'QR scanner stop failed', false, 3000);
+          console.error('QR Stop error:', err);
+        });
+      }
+    }
+
+    // Cleanup on page unload
+    window.addEventListener('unload', async () => {
+      if (roomCode) await remove(ref(db, `rooms/${roomCode}`));
+      stopQR();
+      fileURLs.forEach(url => URL.revokeObjectURL(url));
+      fileURLs = [];
+    });
+  </script>
+</body>
+</html>
