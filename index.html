@@ -720,22 +720,6 @@ font-family: 'Noxlock-Free', 'Poppins', sans-serif;
         console.error('Print error:', error);
       }
     };
-          // Clear previews and revoke URLs
-          filePreview.innerHTML = '';
-          fileURLs.forEach(url => URL.revokeObjectURL(url));
-          fileURLs = [];
-          await update(ref(db, `rooms/${roomCode}`), { fileCount: 0 });
-          document.getElementById('fileCountPhone').textContent = 0;
-          document.getElementById('fileCount').textContent = 0;
-          document.getElementById('printBtn').disabled = true;
-        } else {
-          setStatus('pc', 'No session found', false, 3000);
-        }
-      } catch (error) {
-        setStatus('pc', 'Print failed', false, 3000);
-        console.error('Print error:', error);
-      }
-    };
 
     // QR Code Scanner
     function startQR() {
