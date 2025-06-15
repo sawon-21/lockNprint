@@ -6,6 +6,8 @@
   <title>lockNprint - Secure Print Sharing</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
 
@@ -445,336 +447,366 @@ font-family: 'Noxlock-Free', 'Poppins', sans-serif;
   <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
-    import { getDatabase, ref, set, onValue, get, remove, update } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-database.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getDatabase, ref, set, onValue, get, remove, update, push } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-database.js";
 
-    // Firebase Configuration
-    const firebaseConfig = {
-      apiKey: "AIzaSyAmoQgoL34LdCOmiVgRpiP4PiuyrPaiAAs",
-      authDomain: "safe-f4f8b.firebaseapp.com",
-      projectId: "safe-f4f8b",
-      storageBucket: "safe-f4f8b.appspot.com",
-      messagingSenderId: "842528382804",
-      appId: "1:842528382804:web:4dd1d5451290d46558b2c1",
-      databaseURL: "https://safe-f4f8b-default-rtdb.firebaseio.com"
-    };
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+// Firebase Configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyAmoQgoL34LdCOmiVgRpiP4PiuyrPaiAAs",
+  authDomain: "safe-f4f8b.firebaseapp.com",
+  projectId: "safe-f4f8b",
+  storageBucket: "safe-f4f8b.appspot.com",
+  messagingSenderId: "842528382804",
+  appId: "1:842528382804:web:4dd1d5451290d46558b2c1",
+  databaseURL: "https://safe-f4f8b-default-rtdb.firebaseio.com"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
-    // DOM Elements
-    const home = document.getElementById('home');
-    const pcMode = document.getElementById('pcMode');
-    const phoneMode = document.getElementById('phoneMode');
-    const statusTextPC = document.getElementById('statusTextPC');
-    const statusSpinnerPC = document.getElementById('statusSpinnerPC');
-    const statusTextPhone = document.getElementById('statusTextPhone');
-    const statusSpinnerPhone = document.getElementById('statusSpinnerPhone');
-    const fileInput = document.getElementById('fileInput');
-    const filePreview = document.getElementById('filePreview');
-    let roomCode = '';
-    let qrScanner = null;
-    let fileURLs = []; // Track file URLs for revocation
+// DOM Elements
+const home = document.getElementById('home');
+const pcMode = document.getElementById('pcMode');
+const phoneMode = document.getElementById('phoneMode');
+const statusTextPC = document.getElementById('statusTextPC');
+const statusSpinnerPC = document.getElementById('statusSpinnerPC');
+const statusTextPhone = document.getElementById('statusTextPhone');
+const statusSpinnerPhone = document.getElementById('statusSpinnerPhone');
+const fileInput = document.getElementById('fileInput');
+const filePreview = document.getElementById('filePreview');
+let roomCode = '';
+let qrScanner = null;
+let fileURLs = []; // Track file URLs for revocation
+let filesData = []; // Store file metadata
 
-    // Utility Functions
-    const setStatus = (mode, text, isLoading = false, timeout = 0) => {
-      const statusText = mode === 'pc' ? statusTextPC : statusTextPhone;
-      const statusSpinner = mode === 'pc' ? statusSpinnerPC : statusSpinnerPhone;
-      statusText.textContent = text;
-      statusSpinner.classList.toggle('active', isLoading);
-      if (timeout > 0) {
-        setTimeout(() => {
-          if (mode === 'phone' && statusText.textContent === text) {
-            setStatus('phone', 'Enter code or scan QR', false);
-          }
-        }, timeout);
+// Utility Functions
+const setStatus = (mode, text, isLoading = false, timeout = 0) => {
+  const statusText = mode === 'pc' ? statusTextPC : statusTextPhone;
+  const statusSpinner = mode === 'pc' ? statusSpinnerPC : statusSpinnerPhone;
+  statusText.textContent = text;
+  statusSpinner.classList.toggle('active', isLoading);
+  if (timeout > 0) {
+    setTimeout(() => {
+      if (mode === 'phone' && statusText.textContent === text) {
+        setStatus('phone', 'Enter code or scan QR', false);
       }
-    };
+    }, timeout);
+  }
+};
 
-    // Security: Disable right-click, shortcuts, and dev tools
-    document.addEventListener('contextmenu', e => e.preventDefault());
-    document.addEventListener('keydown', e => {
-      if (e.ctrlKey && (e.key === 's' || e.key === 'S' || e.key === 'u' || e.key === 'U')) e.preventDefault();
-      if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J'))) e.preventDefault();
+// Security: Disable right-click, shortcuts, and dev tools
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && (e.key === 's' || e.key === 'S' || e.key === 'u' || e.key === 'U')) e.preventDefault();
+  if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J'))) e.preventDefault();
+});
+
+// Copy Room Code
+window.copyCode = async () => {
+  try {
+    await navigator.clipboard.writeText(roomCode);
+    setStatus('pc', 'Code copied to clipboard', false, 2000);
+  } catch (error) {
+    setStatus('pc', 'Failed to copy code', false, 2000);
+    console.error('Copy error:', error);
+  }
+};
+
+// Show Mode
+window.showMode = (mode) => {
+  home.classList.add('hidden');
+  home.classList.remove('slideIn');
+  if (mode === 'pc') {
+    pcMode.classList.remove('hidden');
+    pcMode.classList.add('slideIn');
+    initPC();
+  } else {
+    phoneMode.classList.remove('hidden');
+    phoneMode.classList.add('slideIn');
+    initPhone();
+  }
+};
+
+// Initialize PC Mode
+async function initPC() {
+  setStatus('pc', 'Generating code...', true);
+  roomCode = Math.random().toString(36).slice(2, 10).toUpperCase();
+  document.getElementById('genCode').textContent = roomCode;
+  new QRious({ element: document.getElementById('qrCanvas'), value: roomCode, size: 200 });
+  try {
+    await set(ref(db, `rooms/${roomCode}`), { fileCount: 0, printCount: 0, host: true, files: {} });
+    setStatus('pc', 'Waiting for connection...', false);
+
+    // Listen for file updates
+    onValue(ref(db, `rooms/${roomCode}/files`), (snapshot) => {
+      const files = snapshot.val() || {};
+      const count = Object.keys(files).length;
+      document.getElementById('fileCount').textContent = count;
+      document.getElementById('printBtn').disabled = count === 0;
+      if (count > 0) setStatus('pc', 'Ready to print', false);
+      // Update PC-side preview
+      updatePCPreview(files);
     });
 
-    // Copy Room Code
-    window.copyCode = async () => {
-      try {
-        await navigator.clipboard.writeText(roomCode);
-        setStatus('pc', 'Code copied to clipboard', false, 2000);
-      } catch (error) {
-        setStatus('pc', 'Failed to copy code', false, 2000);
-        console.error('Copy error:', error);
-      }
-    };
-
-    // Show Mode
-    window.showMode = (mode) => {
-      home.classList.add('hidden');
-      home.classList.remove('slideIn');
-      if (mode === 'pc') {
-        pcMode.classList.remove('hidden');
-        pcMode.classList.add('slideIn');
-        initPC();
-      } else {
-        phoneMode.classList.remove('hidden');
-        phoneMode.classList.add('slideIn');
-        initPhone();
-      }
-    };
-
-    // Initialize PC Mode
-    async function initPC() {
-      setStatus('pc', 'Generating code...', true);
-      roomCode = Math.random().toString(36).slice(2, 10).toUpperCase();
-      document.getElementById('genCode').textContent = roomCode;
-      new QRious({ element: document.getElementById('qrCanvas'), value: roomCode, size: 200 });
-      try {
-        await set(ref(db, `rooms/${roomCode}`), { fileCount: 0, printCount: 0, host: true });
-        setStatus('pc', 'Waiting for connection...', false);
-
-        // Listen for file updates
-        onValue(ref(db, `rooms/${roomCode}/fileCount`), (snapshot) => {
-          const count = snapshot.val() || 0;
-          document.getElementById('fileCount').textContent = count;
-          document.getElementById('printBtn').disabled = count === 0;
-          if (count > 0) setStatus('pc', 'Ready to print', false);
-        });
-
-        // Listen for print updates
-        onValue(ref(db, `rooms/${roomCode}/printCount`), (snapshot) => {
-          document.getElementById('printCount').textContent = snapshot.val() || 0;
-        });
-      } catch (error) {
-        setStatus('pc', 'Failed to initialize', false, 2000);
-        console.error('PC Init error:', error);
-      }
-    }
-
-    // Initialize Phone Mode
-    function initPhone() {
-      setStatus('phone', 'Enter code or scan QR', false);
-      startQR();
-    }
-
-    // Connect to PC
-    window.connectToPC = async () => {
-      roomCode = document.getElementById('inputCode').value.trim().toUpperCase();
-      if (!roomCode || roomCode.length !== 8) {
-        setStatus('phone', 'Enter a valid 8-character code', false, 3000);
-        return;
-      }
-      setStatus('phone', 'Connecting...', true);
-      try {
-        const snapshot = await get(ref(db, `rooms/${roomCode}/host`));
-        if (!snapshot.exists()) {
-          setStatus('phone', 'PC not online', false, 3000);
-          return;
-        }
-        setStatus('phone', 'Connected to PC', false);
-        document.getElementById('fileUpload').classList.remove('hidden');
-        stopQR();
-
-        // Update initial counts
-        const fileCount = await get(ref(db, `rooms/${roomCode}/fileCount`));
-        document.getElementById('fileCountPhone').textContent = fileCount.val() || 0;
-        const printCount = await get(ref(db, `rooms/${roomCode}/printCount`));
-        document.getElementById('printCountPhone').textContent = printCount.val() || 0;
-
-        // Listen for updates
-        onValue(ref(db, `rooms/${roomCode}/fileCount`), (snapshot) => {
-          document.getElementById('fileCountPhone').textContent = snapshot.val() || 0;
-        });
-        onValue(ref(db, `rooms/${roomCode}/printCount`), (snapshot) => {
-          document.getElementById('printCountPhone').textContent = snapshot.val() || 0;
-        });
-      } catch (error) {
-        setStatus('phone', 'Connection failed', false, 3000);
-        console.error('Connection error:', error);
-      }
-    };
-
-    // File Upload Handler
-    fileInput.addEventListener('change', async (event) => {
-      const files = Array.from(event.target.files);
-      if (files.length === 0) {
-        setStatus('phone', 'No files selected', false, 3000);
-        return;
-      }
-      if (files.some(file => !file.type.match(/image\/.*|application\/pdf/) || file.size > 10 * 1024 * 1024)) {
-        setStatus('phone', 'Invalid file type or size exceeds 10MB', false, 3000);
-        fileInput.value = '';
-        return;
-      }
-      setStatus('phone', 'Uploading files...', true);
-      try {
-        const previews = files.map(file => {
-          const fileId = file.name.replace(/\W/g, '');
-          const url = URL.createObjectURL(file);
-          fileURLs.push(url); // Track for revocation
-          if (file.type.startsWith('image/')) {
-            return `<img src="${url}" alt="${file.name}" class="mb-3" style="animation: fadeIn 0.5s ease;">`;
-          } else if (file.type === 'application/pdf') {
-            return `<iframe src="${url}" height="400" id="previewFrame-${fileId}" class="mb-3" style="animation: fadeIn 0.5s ease;"></iframe>`;
-          }
-          return `<div class="text-muted mb-3">${file.name}</div>`;
-        }).join('');
-        filePreview.innerHTML = previews;
-
-        const currentCount = parseInt(document.getElementById('fileCountPhone').textContent) || 0;
-        await update(ref(db, `rooms/${roomCode}`), { fileCount: currentCount + files.length });
-        document.getElementById('fileCountPhone').textContent = currentCount + files.length;
-        setStatus('phone', `Uploaded ${files.length} file(s) successfully`, false, 3000);
-        fileInput.value = '';
-      } catch (error) {
-        setStatus('phone', 'File upload failed', false, 3000);
-        console.error('File upload error:', error);
-        fileInput.value = '';
-      }
+    // Listen for print updates
+    onValue(ref(db, `rooms/${roomCode}/printCount`), (snapshot) => {
+      document.getElementById('printCount').textContent = snapshot.val() || 0;
     });
+  } catch (error) {
+    setStatus('pc', 'Failed to initialize', false, 2000);
+    console.error('PC Init error:', error);
+  }
+}
+
+// Update PC-side file preview
+function updatePCPreview(files) {
+  filePreview.innerHTML = '';
+  filesData = [];
+  for (const fileId in files) {
+    const file = files[fileId];
+    filesData.push({ id: fileId, url: file.url, type: file.type, name: file.name });
+    if (file.type.startsWith('image/')) {
+      filePreview.innerHTML += `<img src="${file.url}" alt="${file.name}" class="mb-3" style="animation: fadeIn 0.5s ease;">`;
+    } else if (file.type === 'application/pdf') {
+      filePreview.innerHTML += `<iframe src="${file.url}" height="400" id="previewFrame-${fileId}" class="mb-3" style="animation: fadeIn 0.5s ease;"></iframe>`;
+    }
+  }
+}
+
+// Initialize Phone Mode
+function initPhone() {
+  setStatus('phone', 'Enter code or scan QR', false);
+  startQR();
+}
+
+// Connect to PC
+window.connectToPC = async () => {
+  roomCode = document.getElementById('inputCode').value.trim().toUpperCase();
+  if (!roomCode || roomCode.length !== 8) {
+    setStatus('phone', 'Enter a valid 8-character code', false, 3000);
+    return;
+  }
+  setStatus('phone', 'Connecting...', true);
+  try {
+    const snapshot = await get(ref(db, `rooms/${roomCode}/host`));
+    if (!snapshot.exists()) {
+      setStatus('phone', 'PC not online', false, 3000);
+      return;
+    }
+    setStatus('phone', 'Connected to PC', false);
+    document.getElementById('fileUpload').classList.remove('hidden');
+    stopQR();
+
+    // Update initial counts
+    const fileCount = await get(ref(db, `rooms/${roomCode}/fileCount`));
+    document.getElementById('fileCountPhone').textContent = fileCount.val() || 0;
+    const printCount = await get(ref(db, `rooms/${roomCode}/printCount`));
+    document.getElementById('printCountPhone').textContent = printCount.val() || 0;
+
+    // Listen for updates
+    onValue(ref(db, `rooms/${roomCode}/fileCount`), (snapshot) => {
+      document.getElementById('fileCountPhone').textContent = snapshot.val() || 0;
+    });
+    onValue(ref(db, `rooms/${roomCode}/printCount`), (snapshot) => {
+      document.getElementById('printCountPhone').textContent = snapshot.val() || 0;
+    });
+  } catch (error) {
+    setStatus('phone', 'Connection failed', false, 3000);
+    console.error('Connection error:', error);
+  }
+};
+
+// File Upload Handler
+fileInput.addEventListener('change', async (event) => {
+  const files = Array.from(event.target.files);
+  if (files.length === 0) {
+    setStatus('phone', 'No files selected', false, 3000);
+    return;
+  }
+  if (files.some(file => !file.type.match(/image\/(jpeg|png|gif)|application\/pdf/) || file.size > 10 * 1024 * 1024)) {
+    setStatus('phone', 'Only JPEG, PNG, GIF, or PDF files under 10MB allowed', false, 3000);
+    fileInput.value = '';
+    return;
+  }
+  setStatus('phone', 'Uploading files...', true);
+  try {
+    const previews = [];
+    for (const file of files) {
+      const fileId = file.name.replace(/\W/g, '') + Date.now();
+      const url = URL.createObjectURL(file);
+      fileURLs.push(url);
+      filesData.push({ id: fileId, url, type: file.type, name: file.name });
+      await push(ref(db, `rooms/${roomCode}/files`), {
+        name: file.name,
+        type: file.type,
+        url: url,
+        timestamp: Date.now()
+      });
+      if (file.type.startsWith('image/')) {
+        previews.push(`<img src="${url}" alt="${file.name}" class="mb-3" style="animation: fadeIn 0.5s ease;">`);
+      } else if (file.type === 'application/pdf') {
+        previews.push(`<iframe src="${url}" height="400" id="previewFrame-${fileId}" class="mb-3" style="animation: fadeIn 0.5s ease;"></iframe>`);
+      }
+    }
+    filePreview.innerHTML = previews.join('');
+    const currentCount = parseInt(document.getElementById('fileCountPhone').textContent) || 0;
+    await update(ref(db, `rooms/${roomCode}`), { fileCount: currentCount + files.length });
+    setStatus('phone', `Uploaded ${files.length} file(s) successfully`, false, 3000);
+    fileInput.value = '';
+  } catch (error) {
+    setStatus('phone', 'File upload failed', false, 3000);
+    console.error('File upload error:', error);
+    fileInput.value = '';
+  }
+});
 
 // Print Files
-    window.printFiles = async () => {
-      setStatus('pc', 'Preparing to print...', true);
-      try {
-        const snapshot = await db.ref(`rooms/${roomCode}`).once('value');
-        if (!snapshot.exists()) {
-          setStatus('pc', 'No session found', false, 3000);
-          return;
-        }
-        const data = snapshot.val();
-        const fileCount = data.fileCount || 0;
-        if (fileCount === 0) {
-          setStatus('pc', 'No files to print', false, 3000);
-          return;
-        }
+window.printFiles = async () => {
+  setStatus('pc', 'Preparing to print...', true);
+  try {
+    const snapshot = await get(ref(db, `rooms/${roomCode}`));
+    if (!snapshot.exists()) {
+      setStatus('pc', 'No session found', false, 3000);
+      return;
+    }
+    const data = snapshot.val();
+    const fileCount = data.fileCount || 0;
+    if (fileCount === 0) {
+      setStatus('pc', 'No files to print', false, 3000);
+      return;
+    }
+    if (filesData.length === 0) {
+      setStatus('pc', 'No previews available to print', false, 3000);
+      return;
+    }
 
-        const images = filePreviewPC.querySelectorAll('img');
-        const iframes = filePreviewPC.querySelectorAll('iframe[id^="previewFrame-"]');
-        if (images.length === 0 && iframes.length === 0) {
-          setStatus('pc', 'No previews available to print', false, 3000);
-          return;
-        }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    let yOffset = 10;
 
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        let yOffset = 10;
-
-        for (const img of images) {
-          const imgData = await new Promise(resolve => {
+    for (const file of filesData) {
+      if (file.type.startsWith('image/')) {
+        const img = new Image();
+        img.src = file.url;
+        await new Promise(resolve => {
+          img.onload = () => {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             canvas.width = img.naturalWidth;
             canvas.height = img.naturalHeight;
             ctx.drawImage(img, 0, 0);
-            resolve(canvas.toDataURL('image/jpeg'));
-          });
-          doc.addImage(imgData, 'JPEG', 10, yOffset, 190, 0);
-          yOffset += (img.naturalHeight / img.naturalWidth) * 190 + 10;
-          if (yOffset > 280) {
-            doc.addPage();
-            yOffset = 10;
-          }
-        }
-
-        for (const iframe of iframes) {
-          doc.text('PDF Document (Open in browser to print)', 10, yOffset);
-          yOffset += 20;
-          if (yOffset > 280) {
-            doc.addPage();
-            yOffset = 10;
-          }
-        }
-
-        const pdfBlob = doc.output('blob');
-        const url = URL.createObjectURL(pdfBlob);
-        fileURLs.push(url);
-        const printWindow = window.open(url, '_blank');
-        if (!printWindow) {
-          setStatus('pc', 'Popup blocked! Please allow popups.', false, 3000);
-          return;
-        }
-        printWindow.onload = () => {
-          printWindow.print();
-          printWindow.onafterprint = () => printWindow.close();
-        };
-
-        await db.ref(`rooms/${roomCode}`).update({
-          printCount: (data.printCount || 0) + 1,
+            const imgData = canvas.toDataURL('image/jpeg');
+            doc.addImage(imgData, 'JPEG', 10, yOffset, 190, 0);
+            yOffset += (img.naturalHeight / img.naturalWidth) * 190 + 10;
+            if (yOffset > 280) {
+              doc.addPage();
+              yOffset = 10;
+            }
+            resolve();
+          };
+          img.onerror = () => {
+            console.error(`Failed to load image: ${file.name}`);
+            resolve();
+          };
         });
-        setStatus('pc', `Printed ${fileCount} file(s)`, false, 3000);
-
-        filePreviewPC.innerHTML = '';
-        filePreview.innerHTML = '';
-        fileURLs.forEach(url => URL.revokeObjectURL(url));
-        fileURLs = [];
-        await db.ref(`rooms/${roomCode}`).update({
-          fileCount: 0,
-          files: {},
-        });
-        document.getElementById('fileCountPhone').textContent = 0;
-        document.getElementById('fileCount').textContent = 0;
-        document.getElementById('printBtn').disabled = true;
-      } catch (error) {
-        setStatus('pc', 'Print failed', false, 3000);
-        console.error('Print error:', error);
+      } else if (file.type === 'application/pdf') {
+        doc.text(`PDF Document: ${file.name} (Open separately to print)`, 10, yOffset);
+        yOffset += 20;
+        if (yOffset > 280) {
+          doc.addPage();
+          yOffset = 10;
+        }
       }
+    }
+
+    const pdfBlob = doc.output('blob');
+    const url = URL.createObjectURL(pdfBlob);
+    fileURLs.push(url);
+    const printWindow = window.open(url, '_blank');
+    if (!printWindow) {
+      setStatus('pc', 'Popup blocked! Please allow popups.', false, 3000);
+      URL.revokeObjectURL(url);
+      return;
+    }
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+      setTimeout(() => printWindow.close(), 1000); // Fallback if onafterprint fails
     };
 
-    // QR Code Scanner
-    function startQR() {
-      if (!qrScanner) {
-        qrScanner = new Html5Qrcode('reader');
-        Html5Qrcode.getCameras().then(devices => {
-          if (devices && devices.length) {
-            const backCam = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
-            qrScanner.start(
-              backCam.id,
-              { fps: 10, qrbox: { width: 250, height: 250 } },
-              (decodedText) => {
-                if (decodedText.length === 8) {
-                  setStatus('phone', 'QR scanned, connecting...', true);
-                  document.getElementById('inputCode').value = decodedText.toUpperCase();
-                  connectToPC();
-                } else {
-                  setStatus('phone', 'Invalid QR code', false, 3000);
-                }
-              },
-              () => {}
-            ).catch(err => {
-              setStatus('phone', 'QR scanner error: Camera access denied', false, 3000);
-              console.error('QR Scanner error:', err);
-            });
-          } else {
-            setStatus('phone', 'No cameras found', false, 3000);
-          }
-        }).catch(err => {
-          setStatus('phone', 'Failed to access cameras', false, 3000);
-          console.error('Camera access error:', err);
-        });
-      }
-    }
-
-    function stopQR() {
-      if (qrScanner) {
-        qrScanner.stop().then(() => {
-          qrScanner.clear();
-          qrScanner = null;
-          document.getElementById('reader').innerHTML = '';
-        }).catch(err => {
-          setStatus('phone', 'QR scanner stop failed', false, 3000);
-          console.error('QR Stop error:', err);
-        });
-      }
-    }
-
-    // Cleanup on page unload
-    window.addEventListener('unload', async () => {
-      if (roomCode) await remove(ref(db, `rooms/${roomCode}`));
-      stopQR();
-      fileURLs.forEach(url => URL.revokeObjectURL(url));
-      fileURLs = [];
+    await update(ref(db, `rooms/${roomCode}`), {
+      printCount: (data.printCount || 0) + 1,
+      fileCount: 0,
+      files: {}
     });
+    setStatus('pc', `Printed ${fileCount} file(s)`, false, 3000);
+
+    filePreview.innerHTML = '';
+    filesData = [];
+    fileURLs.forEach(url => URL.revokeObjectURL(url));
+    fileURLs = [];
+    document.getElementById('fileCountPhone').textContent = 0;
+    document.getElementById('fileCount').textContent = 0;
+    document.getElementById('printBtn').disabled = true;
+  } catch (error) {
+    setStatus('pc', 'Print failed: ' + error.message, false, 3000);
+    console.error('Print error:', error);
+  }
+};
+
+// QR Code Scanner
+function startQR() {
+  if (!qrScanner) {
+    qrScanner = new Html5Qrcode('reader');
+    Html5Qrcode.getCameras().then(devices => {
+      if (devices && devices.length) {
+        const backCam = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
+        qrScanner.start(
+          backCam.id,
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => {
+            if (decodedText.length === 8) {
+              setStatus('phone', 'QR scanned, connecting...', true);
+              document.getElementById('inputCode').value = decodedText.toUpperCase();
+              connectToPC();
+            } else {
+              setStatus('phone', 'Invalid QR code', false, 3000);
+            }
+          },
+          () => {}
+        ).catch(err => {
+          setStatus('phone', 'Camera access denied. Please allow camera access.', false, 3000);
+          console.error('QR Scanner error:', err);
+        });
+      } else {
+        setStatus('phone', 'No cameras found', false, 3000);
+      }
+    }).catch(err => {
+      setStatus('phone', 'Failed to access cameras', false, 3000);
+      console.error('Camera access error:', err);
+    });
+  }
+}
+
+function stopQR() {
+  if (qrScanner) {
+    qrScanner.stop().then(() => {
+      qrScanner.clear();
+      qrScanner = null;
+      document.getElementById('reader').innerHTML = '';
+    }).catch(err => {
+      setStatus('phone', 'QR scanner stop failed', false, 3000);
+      console.error('QR Stop error:', err);
+    });
+  }
+}
+
+// Cleanup on page unload
+window.addEventListener('unload', async () => {
+  if (roomCode) await remove(ref(db, `rooms/${roomCode}`));
+  stopQR();
+  fileURLs.forEach(url => URL.revokeObjectURL(url));
+  fileURLs = [];
+});
   </script>
 </body>
 </html>
