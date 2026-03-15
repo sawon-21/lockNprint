@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Shield, Smartphone, Monitor, Info, Lock } from 'lucide-react';
 import { AppMode } from '../App';
@@ -8,6 +9,13 @@ interface HomeProps {
 }
 
 export function Home({ setMode, openInfo }: HomeProps) {
+  const [deviceType, setDeviceType] = useState<'mobile' | 'desktop' | null>(null);
+
+  useEffect(() => {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    setDeviceType(isMobile ? 'mobile' : 'desktop');
+  }, []);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -45,6 +53,7 @@ export function Home({ setMode, openInfo }: HomeProps) {
           onClick={() => setMode('phone')}
           className="group relative overflow-hidden bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 hover:border-emerald-500/50 text-zinc-200 py-4 px-6 rounded-xl font-medium transition-all flex items-center justify-center gap-4 shadow-lg"
         >
+          {deviceType === 'mobile' && <span className="absolute top-0 right-0 bg-emerald-500 text-zinc-950 text-[9px] font-bold px-2 py-1 rounded-bl-lg">RECOMMENDED</span>}
           <Smartphone className="w-6 h-6 text-emerald-500" />
           <div className="flex flex-col items-start">
             <span className="tracking-wide">Initialize Uplink</span>
@@ -56,6 +65,7 @@ export function Home({ setMode, openInfo }: HomeProps) {
           onClick={() => setMode('pc')}
           className="group relative overflow-hidden bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 hover:border-cyan-500/50 text-zinc-200 py-4 px-6 rounded-xl font-medium transition-all flex items-center justify-center gap-4 shadow-lg"
         >
+          {deviceType === 'desktop' && <span className="absolute top-0 right-0 bg-cyan-500 text-zinc-950 text-[9px] font-bold px-2 py-1 rounded-bl-lg">RECOMMENDED</span>}
           <Monitor className="w-6 h-6 text-cyan-500" />
           <div className="flex flex-col items-start">
             <span className="tracking-wide">Host Terminal</span>
