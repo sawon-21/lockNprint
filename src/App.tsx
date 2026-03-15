@@ -30,8 +30,9 @@ export default function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1e1e2f] via-[#2a2a4a] to-[#3b3b6a] text-[#e0e0e0] font-sans flex justify-center items-center overflow-x-hidden select-none p-4">
-      <div className="w-full max-w-lg">
+    <div className="min-h-screen bg-zinc-950 text-zinc-300 font-sans flex justify-center items-center overflow-x-hidden select-none p-4 relative">
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
+      <div className="w-full max-w-lg relative z-10">
         <Suspense fallback={<LoadingFallback />}>
           <AnimatePresence mode="wait">
             {mode === 'home' && <Home key="home" setMode={setMode} openInfo={() => setIsInfoOpen(true)} />}
@@ -50,8 +51,8 @@ export default function App() {
 
 function LoadingFallback() {
   return (
-    <div className="flex justify-center items-center h-64 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-md shadow-2xl">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+    <div className="flex justify-center items-center h-64 bg-zinc-900/50 border border-zinc-800 rounded-3xl backdrop-blur-xl shadow-2xl">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div>
     </div>
   );
 }
